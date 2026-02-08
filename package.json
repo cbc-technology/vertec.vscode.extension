@@ -1,9 +1,8 @@
 {
-	"name": "vertec.vscode.extension",
+	"name": "vertec-vscode-extension",
 	"displayName": "Vertec Visual Studio Code extension",
 	"description": "This is a simple extension to provide usefull utilities for the day to day Vertec administrator.",
 	"version": "1.0.0",
-	"publisher": "Christian Bruns - Vertec Gmbh",
 	"private": true,
 	"license": "MIT",
 	"repository": {
@@ -17,7 +16,7 @@
 		"Other"
 	],
 	"activationEvents": [
-		"onCommand:vertec.vscode.extension"
+		"onCommand:vertec-vscode-extension"
 	],
 	"main": "./out/extension.js",
 	"contributes": {
