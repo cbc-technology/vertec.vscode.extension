@@ -4,278 +4,271 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { QuickPickItem, window } from 'vscode';
-import * as fs from 'fs';
 import * as vscode from 'vscode';
+import { getTranslations, getModel, VertecTranslation, VertecClass, EnrichedVertecMember, EnrichedVertecAssociation } from './DataProvider';
 
-/**
- * A multi-step input using window.createQuickPick() and window.createInputBox().
- *
- * This first part uses the helper class `Translator` that wraps the API for the multi-step case.
- */
+class TranslationQuickPickItem implements QuickPickItem {
+	label: string;
+	description: string;
+	detail: string;
 
-const title = 'Vertec Visual Studio Code extension';
-const languages = ['Englisch', 'Deutsch'];
-const tasks = ['Copy value', 'Insert value'];
-
-export async function translateClass() {
-	// Select classname
-	const classname = await window.showQuickPick(
-		getClassesAndMembersJsonFile('class'),
-		{
-			placeHolder: 'Input the class name',
-			title: title,
-			matchOnDescription: true,
-			matchOnDetail: true,
-		}
-	);
-	if (!classname) {
-		return;
-	}
-
-	// Select language
-	const language = await pickLanguage();
-	if (!language) {
-		return;
-	}
-
-	// Get translation text.
-	let translation = '';
-	if (language == 'Deutsch') {
-		translation = classname.label;
-	} else {
-		translation = classname.description ? classname.description : '';
-	}
-	translation = translation.trim();
-
-	// Get task to do
-	const editor = vscode.window.activeTextEditor;
-	const task = await pickTask();
-	if (!task || !editor) {
-		return;
-	}
-
-	// Exec task
-	if (task == 'Copy value') {
-		vscode.env.clipboard.writeText(translation);
-	}
-	if (task == 'Insert value') {
-		editor.edit(e => {
-            e.replace(editor.selection.active, translation);
-        });
-	}
-}
-
-export async function translateMember() {
-	// Select membername
-	const membername = await window.showQuickPick(
-		getClassesAndMembersJsonFile('member'),
-		{
-			placeHolder: 'Input the member name',
-			title: title,
-			matchOnDescription: true,
-			matchOnDetail: true,
-		}
-	);
-	if (!membername) {
-		return;
-	}
-
-	// Select language
-	const language = await pickLanguage();
-	if (!language) {
-		return;
-	}
-
-	// Get translation text.
-	let translation = '';
-	if (language == 'Deutsch') {
-		translation = membername.label;
-	} else {
-		translation = membername.description ? membername.description : '';
-	}
-	translation = translation.trim();
-
-	// Get task to do
-	const editor = vscode.window.activeTextEditor;
-	const task = await pickTask();
-	if (!task || !editor) {
-		return;
-	}
-
-	// Exec task
-	if (task == 'Copy value') {
-		vscode.env.clipboard.writeText(translation);
-	}
-	if (task == 'Insert value') {
-		editor.edit(e => {
-            e.replace(editor.selection.active, translation);
-        });
-	}
-}
-
-export async function translateText() {
-	// Select membername
-	const membername = await window.showQuickPick(
-		getTranslationsJsonFile(),
-		{
-			placeHolder: 'Input the member name',
-			title: title,
-			matchOnDescription: true,
-			matchOnDetail: true,
-		}
-	);
-	if (!membername) {
-		return;
-	}
-
-	// Select language
-	const language = await pickLanguage();
-	if (!language) {
-		return;
-	}
-
-	// Get translation text.
-	let translation = '';
-	if (language == 'Deutsch') {
-		translation = membername.label;
-	} else {
-		translation = membername.detail ? membername.detail : '';
-	}
-	translation = translation.trim();
-
-	// Get task to do
-	const editor = vscode.window.activeTextEditor;
-	const task = await pickTask();
-	if (!task || !editor) {
-		return;
-	}
-
-	// Exec task
-	if (task == 'Copy value') {
-		vscode.env.clipboard.writeText(translation);
-	}
-	if (task == 'Insert value') {
-		editor.edit(e => {
-            e.replace(editor.selection.active, translation);
-        });
-	}
-}
-
-async function pickLanguage() {
-	return await window.showQuickPick(
-		languages,
-		{
-			placeHolder: 'Select your language',
-			title: title,
-		}
-	);
-}
-
-async function pickTask() {
-	return await window.showQuickPick(
-		tasks,
-		{
-			placeHolder: 'What should we do now?',
-			title: title,
-		}
-	);
-}
-
-async function getClassesAndMembersJsonFile(type: string): Promise<QuickPickItem[]> {
-	let jsonString = "";
-	const path = vscode.workspace.getConfiguration("vertecVscodeExtension").get("ClassesMembersUrl", "");
-	if (path === '') {
-		window.showWarningMessage('No JSON file path found in the settings. Please specify file path.');
-		return [].map(label => ({ label }));
-	}
-
-	try {
-		jsonString = fs.readFileSync(path, 'utf8');
-	} catch (err) {
-		window.showWarningMessage(`Could not load JSON file from path: ${path} (Error: ${err})`);
-		return [].map(label => ({ label }));
-	}
-	const jsonData = JSON.parse(jsonString);
-	if (!jsonData) {
-		return [].map(label => ({ label }));
-	}
-
-	let data = [];
-	if (type === 'class') {
-		data = jsonData.map((item: any) => {
-			return new ClassTranslationItem(item.ClassDE, item.ClassEN);
-		});
-	} else {
-		data = jsonData.map((item: any) => {
-			return new ClassTranslationItem(item.MemberDE, item.MemberEN, jsonData.filter((subitem: any) => subitem.MemberDE === item.MemberDE).map((subitem: any) => {
-				return `${subitem.ClassDE}, ${subitem.ClassEN}`;
-			}).join(', '));
-		});
-	}
-
-	return remove_object_duplicates(data, 'label');
-}
-
-async function getTranslationsJsonFile(): Promise<QuickPickItem[]> {
-	let jsonString = "";
-	const path = vscode.workspace.getConfiguration("vertecVscodeExtension").get("TranslationsUrl", "");
-	if (path === '') {
-		window.showWarningMessage('No JSON file path found in the settings. Please specify file path.');
-		return [].map(label => ({ label }));
-	}
-
-	try {
-		jsonString = fs.readFileSync(path, 'utf8');
-	} catch (err) {
-		window.showWarningMessage(`Could not load JSON file from path: ${path} (Error: ${err})`);
-		return [].map(label => ({ label }));
-	}
-	const jsonData = JSON.parse(jsonString);
-	if (!jsonData) {
-		return [].map(label => ({ label }));
-	}
-
-	const data = jsonData.map((item: any) => {
+	constructor(translation: VertecTranslation) {
 		let de = '';
-		if (item.NVD) {
-			de = item.NVD;
-		} else if (item.DD0) {
-			de = item.DD0;
-		} else if (item.DE0) {
-			de = item.DE0;
-		} else if (item.DD1) {
-			de = item.DD1;
-		} else {
-			de = item.DE1;
+		if (translation.NVD) {
+			de = translation.NVD;
+		} else if (translation.DD0) {
+			de = translation.DD0;
+		} else if (translation.DE0) {
+			de = translation.DE0;
+		} else if (translation.DD1) {
+			de = translation.DD1;
+		} else if (translation.DE1) {
+			de = translation.DE1;
 		}
 
 		let en = '';
-		if (item.NVE) {
-			en = item.NVE;
-		} else if (item.EN0) {
-			en = item.EN0;
-		} else {
-			en = item.EN1;
+		if (translation.NVE) {
+			en = translation.NVE;
+		} else if (translation.EN0) {
+			en = translation.EN0;
+		} else if (translation.EN1) {
+			en = translation.EN1;
 		}
 
-		return new ClassTranslationItem(de, '', en);
-	});
-
-	return data;
+		this.label = de || en;
+		this.description = '';
+		this.detail = en || de;
+	}
 }
 
-function remove_object_duplicates(arr: [], key: any) {
-    return [...new Map(arr.map(item => [item[key], item])).values()];
-}
-
-class ClassTranslationItem implements QuickPickItem {
+class ClassQuickPickItem implements QuickPickItem {
 	label: string;
-	description = '';
-	detail = '';
+	description: string;
+	detail: string;
 
-	constructor(label: string, description: string, detail = '') {
-		this.label = label;
-		this.description = description;
-		this.detail = detail;
+	constructor(verteclass: VertecClass) {
+		this.label = verteclass.name;
+		this.description = '';
+		this.detail = verteclass.name_alt || verteclass.name;
+	}
+}
+
+class MemberQuickPickItem implements QuickPickItem {
+	label: string;
+	description: string;
+	detail: string;
+
+	constructor(memberOrAssociation: EnrichedVertecMember | EnrichedVertecAssociation) {
+		this.label = memberOrAssociation.name;
+		this.description = '';
+		this.detail = memberOrAssociation.name_alt || memberOrAssociation.name;
+
+		this.label = this.label.toLowerCase();
+		this.detail = this.detail.toLowerCase();
+	}
+}
+
+const LANGUAGES = ['Englisch', 'Deutsch'];
+const TASK_COPY = 'Copy value';
+const TASK_INSERT = 'Insert value';
+const TASKS = [TASK_COPY, TASK_INSERT];
+
+/**
+ * Shows a quick pick to select a member, then a language and finally a task to do with the translation (copy or insert).
+ */
+async function showTranslationDialogues(
+	quickpicks: QuickPickItem[],
+	placeholder: string,
+) {
+	try {
+
+		// Select translation
+		const selection = await window.showQuickPick(
+			quickpicks,
+			{
+				placeHolder: placeholder,
+				matchOnDescription: true,
+				matchOnDetail: true,
+			}
+		);
+		if (!selection) {
+			return;
+		}
+
+		// Select language
+		const language = await pickLanguage();
+		if (!language) {
+			return;
+		}
+
+		// Get translation text.
+		let translation = '';
+		if (language == 'Deutsch') {
+			translation = selection.label;
+		} else {
+			translation = selection.detail || selection.label;
+		}
+		translation = translation.trim();
+
+		// Select task. If we have no editor, we can only copy the value, but not insert it.
+		const editor = vscode.window.activeTextEditor;
+		const task = await pickTask(editor);
+		if (!task) {
+			return;
+		}
+
+		// Exec task.
+		if (task === TASK_COPY) {
+			vscode.env.clipboard.writeText(translation);
+		}
+		if (editor && task === TASK_INSERT) {
+			editor.edit(e => {
+				e.replace(editor.selection.active, translation);
+			});
+		}
+
+	} catch (error) {
+		console.error('Error showing the translation dialogues:', error);
+		vscode.window.showErrorMessage('Error showing the translation dialogues.');
+	}
+}
+
+/**
+ * Filters the array to unique items based on the specified keys.
+ * @param array The array to filter.
+ * @param keys The keys to determine uniqueness.
+ * @returns A new array with unique items based on the specified keys.
+ */
+function filterUniqueBy<T>(array: T[], ...keys: (keyof T)[]): T[] {
+    const seen = new Set<string>();
+    return array.filter(item => {
+        const compositeKey = keys.map(k => String(item[k])).join('|');
+        if (seen.has(compositeKey)) {
+			return false;
+		}
+        seen.add(compositeKey);
+        return true;
+    });
+}
+
+/**
+ * Shows a quick pick to select a language.
+ */
+async function pickLanguage() {
+	return await window.showQuickPick(
+		LANGUAGES,
+		{
+			placeHolder: 'Search for a language ...',
+		}
+	);
+}
+
+/**
+ * Shows a quick pick to select a task.
+ */
+async function pickTask(editor: vscode.TextEditor | undefined) {
+	return await window.showQuickPick(
+		editor ? TASKS : [TASK_COPY],
+		{
+			placeHolder: 'What would you like to do now?',
+		}
+	);
+}
+
+/**
+ * Shows a quick pick to select a class, then a language and finally a task to do with the translation (copy or insert).
+ */
+export async function translateClass() {
+	try {
+		// Load data (uses the cache, if available)
+		const classes = await getModel<VertecClass>(false);
+
+		if (!classes || classes.length === 0) {
+			vscode.window.showWarningMessage('No classes found.');
+			return;
+		}
+
+		// Map classes to quick pick items.
+		const classQuickPickItems = classes.map((vertecclass: VertecClass) => {
+			return new ClassQuickPickItem(vertecclass);
+		});
+
+		await showTranslationDialogues(
+			classQuickPickItems.sort((a, b) => a.label.localeCompare(b.label)),
+			'Search for a class ...'
+		);
+
+	} catch (error) {
+		console.error('Error loading the data:', error);
+		vscode.window.showErrorMessage('An error occured while loading the model data.');
+	}
+}
+
+/**
+ * Shows a quick pick to select a member, then a language and finally a task to do with the translation (copy or insert).
+ */
+export async function translateMember() {
+	try {
+		// Load data (uses the cache, if available)
+		const classes = await getModel<VertecClass>(false);
+
+		if (!classes || classes.length === 0) {
+			vscode.window.showWarningMessage('No classes found.');
+			return;
+		}
+
+		// Create quick pick items for all members and associations of all classes.
+		const memberQuickPickItems: MemberQuickPickItem[] = [];
+		classes.forEach(vertecclass => {
+			if (vertecclass.members) {
+				vertecclass.members.forEach(member => {
+					memberQuickPickItems.push(new MemberQuickPickItem(member));
+				});
+			}
+			if (vertecclass.associations) {
+				vertecclass.associations.forEach(association => {
+					memberQuickPickItems.push(new MemberQuickPickItem(association));
+				});
+			}
+		});
+
+		await showTranslationDialogues(
+			filterUniqueBy(memberQuickPickItems, 'label', 'detail').sort((a, b) => a.label.localeCompare(b.label)),
+			'Search for a member or association ...'
+		);
+
+
+	} catch (error) {
+		console.error('Error loading the data:', error);
+		vscode.window.showErrorMessage('An error occured while loading the model data.');
+	}
+}
+
+/**
+ * Shows a quick pick to select a member, then a language and finally a task to do with the translation (copy or insert).
+ */
+export async function translateText() {
+	try {
+		// Load data (uses the cache, if available).
+		const translations = await getTranslations<VertecTranslation>(false);
+
+		if (!translations || translations.length === 0) {
+			vscode.window.showWarningMessage('No translations found.');
+			return;
+		}
+
+		// Map translations to quick pick items.
+		const translationItems = translations.map((translation: VertecTranslation) => {
+			return new TranslationQuickPickItem(translation);
+		});
+
+		await showTranslationDialogues(
+			translationItems.sort((a, b) => a.label.localeCompare(b.label)),
+			'Search for a text ...'
+	);
+
+	} catch (error) {
+		console.error('Error loading the data:', error);
+		vscode.window.showErrorMessage('An error occured while loading the translations data.');
 	}
 }

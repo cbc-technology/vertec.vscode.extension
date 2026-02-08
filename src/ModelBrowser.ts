@@ -86,7 +86,7 @@ async function showClassDetails(vertecClass: VertecClass, allClasses: VertecClas
         members.forEach(member => {
             if (member.sourceClass === vertecClass.name || member.sourceClass === vertecClass.name_alt) {
                 items.push({
-                    label: `${member.name} | ${member.name_alt}`,
+                    label: `${member.name.toLowerCase()} | ${member.name_alt.toLowerCase()}`,
                     description: `${member.member_type} | Length: ${member.length}`,
                     detail: `${member.description || '-/-'} | Persistent: ${member.is_derived ? 'No' : 'Yes'} | Nullable: ${member.is_nullable ? 'Yes' : 'No'} | Indexed: ${member.is_indexed ? 'Yes' : 'No'}`,
                     data: member
@@ -102,7 +102,7 @@ async function showClassDetails(vertecClass: VertecClass, allClasses: VertecClas
         members.forEach(member => {
             if (member.sourceClass !== vertecClass.name && member.sourceClass !== vertecClass.name_alt) {
                 items.push({
-                    label: `${member.name} | ${member.name_alt}`,
+                    label: `${member.name.toLowerCase()} | ${member.name_alt.toLowerCase()}`,
                     description: `${member.member_type} | Length: ${member.length} (from ${member.sourceClass})`,
                     detail: `${member.description || '-/-'} | Persistent: ${member.is_derived ? 'No' : 'Yes'} | Nullable: ${member.is_nullable ? 'Yes' : 'No'} | Indexed: ${member.is_indexed ? 'Yes' : 'No'}`,
                     data: member
@@ -127,7 +127,7 @@ async function showClassDetails(vertecClass: VertecClass, allClasses: VertecClas
                 const role_multi = assoc[`is_role${roletype}_multi`];
 
                 items.push({
-                    label: `${assoc.perceived_name}`,
+                    label: `${assoc.perceived_name.toLowerCase()}`,
                     description: `Link class: ${assoc.association_class?.name || '-/-'}`,
                     detail: `${role_description || '-/-'} | Class: ${role_class?.name || '-/-'} | Persistent: ${assoc.is_derived ? 'No' : 'Yes'} | Multi: ${role_multi ? 'Yes' : 'No'}`,
                     data: assoc
@@ -148,7 +148,7 @@ async function showClassDetails(vertecClass: VertecClass, allClasses: VertecClas
                 const role_multi = assoc[`is_role${roletype}_multi`];
 
                 items.push({
-                    label: `${assoc.perceived_name} (from ${assoc.sourceClass})`,
+                    label: `${assoc.perceived_name.toLowerCase()} (from ${assoc.sourceClass})`,
                     description: `Link class: ${assoc.association_class?.name || '-/-'}`,
                     detail: `${role_description || '-/-'} | Class: ${role_class?.name || '-/-'} | Persistent: ${assoc.is_derived ? 'No' : 'Yes'} | Multi: ${role_multi ? 'Yes' : 'No'}`,
                     data: assoc
@@ -165,7 +165,7 @@ async function showClassDetails(vertecClass: VertecClass, allClasses: VertecClas
     }
 
     const selection = await vscode.window.showQuickPick(items, {
-        placeHolder: `Search for a member or association...`,
+        placeHolder: `Search for a member or association ...`,
         matchOnDescription: true,
         matchOnDetail: true
     });

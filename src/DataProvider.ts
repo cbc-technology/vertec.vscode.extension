@@ -8,9 +8,13 @@ interface ModelApiResponse<T> {
     results: T[];
 }
 
+interface TranslationApiResponse<T> {
+    data: T[];
+}
+
 interface VertecMember {
     name: string;
-    name_alt?: string;
+    name_alt: string;
     member_type?: string;
     description?: string;
     length?: number;
@@ -21,8 +25,8 @@ interface VertecMember {
 
 interface VertecAssociation {
     name: string;
-    name_alt?: string;
-    perceived_name?: string;
+    name_alt: string;
+    perceived_name: string;
     association_class: VertecClassRef;
     description?: string;
     is_derived?: boolean
@@ -49,7 +53,7 @@ interface VertecClassRef {
 
 export interface VertecClass {
     name: string;
-    name_alt?: string;
+    name_alt: string;
     class_id: number;
     superclass?: VertecClassRef;
     table_mapping?: string,
@@ -69,17 +73,43 @@ export interface EnrichedVertecAssociation extends VertecAssociation {
     sourceClass?: string; // Name of the class from which the association originates.
 }
 
+export interface VertecTranslation {
+    NVD?: string;  // German (default)
+    NVE?: string;  // English (default)
+    EN0?: string;  // English project
+    EN1?: string;  // English matters
+    DE0?: string;  // Swiss german project
+    DE1?: string;  // Siwss german matters
+    DD0?: string;  // German project (DD)
+    DD1?: string;  // German matters (DD)
+    FR0?: string;  // French project
+    FR1?: string;  // French matters
+    IT0?: string;  // Italian project
+    IT1?: string;  // Italian matters
+}
+
 
 /*
-* Model cache implementation with an in memory and gloablState cache layer.
+* Generic cache implementation with an in memory and gloablState cache layer.
+* Each cache instance is identified by a unique key.
 * The cache duration can be configured in the extension settings and defaults to 30 days.
 */
-class ModelCache<T> {
+class DataCache<T> {
     private context: vscode.ExtensionContext | null = null;
+    // private cache: Map<string, { data: T[]; timestamp: number }> = new Map(); // TODO
     private cache: Map<string, { data: T[]; timestamp: number }> = new Map<string, { data: T[]; timestamp: number }>();
+    private cacheDataKey: string;
+    private cacheTimestampKey: string;
+    private cacheLifetimeDays: number;
+
+    constructor(cacheDataKey: string, cacheTimestampKey: string, cacheLifetimeDays: number) {
+        this.cacheDataKey = cacheDataKey;
+        this.cacheTimestampKey = cacheTimestampKey;
+        this.cacheLifetimeDays = cacheLifetimeDays;
+    }
 
     /**
-     * Initialisiert den Cache mit Extension Context für persistenten Storage
+     * Initializes the cache with Extension Context for persistent storage
      */
     initialize(context: vscode.ExtensionContext): void {
         this.context = context;
@@ -96,16 +126,18 @@ class ModelCache<T> {
         }
 
         try {
-            const cachedData = this.context.globalState.get<T[]>(CACHE_MODEL_KEY);
-            const timestamp = this.context.globalState.get<number>(CACHE_TIMESTAMP_KEY);
+            const cachedData = this.context.globalState.get<T[]>(this.cacheDataKey);
+            const timestamp = this.context.globalState.get<number>(this.cacheTimestampKey);
 
             if (cachedData && timestamp) {
-                const isExpired = Date.now() - timestamp > CACHE_LIFETIME * 24 * 60 * 60 * 1000; // Conversion from days to milliseconds.
+                const age = Date.now() - timestamp;
+                const maxAge = this.cacheLifetimeDays * 24 * 60 * 60 * 1000;
+                const isExpired = age > maxAge;
 
                 // If the cache data is still valid, load it into the in-memory cache.
-                // Elese, clear the globalState cache.
+                // Else, clear the globalState cache.
                 if (!isExpired) {
-                    this.cache.set(CACHE_MODEL_KEY, {
+                    this.cache.set(this.cacheDataKey, {
                         data: cachedData,
                         timestamp: timestamp
                     });
@@ -129,8 +161,8 @@ class ModelCache<T> {
         }
 
         try {
-            await this.context.globalState.update(CACHE_MODEL_KEY, data);
-            await this.context.globalState.update(CACHE_TIMESTAMP_KEY, timestamp);
+            await this.context.globalState.update(this.cacheDataKey, data);
+            await this.context.globalState.update(this.cacheTimestampKey, timestamp);
             console.log('Data saved to cache');
         } catch (error) {
             console.error('Error saving data to cache:', error);
@@ -146,8 +178,8 @@ class ModelCache<T> {
         }
 
         try {
-            await this.context.globalState.update(CACHE_MODEL_KEY, undefined);
-            await this.context.globalState.update(CACHE_TIMESTAMP_KEY, undefined);
+            await this.context.globalState.update(this.cacheDataKey, undefined);
+            await this.context.globalState.update(this.cacheTimestampKey, undefined);
             console.log('Cache cleared');
         } catch (error) {
             console.error('Error clearing cache:', error);
@@ -155,14 +187,16 @@ class ModelCache<T> {
     }
 
     get(): T[] | null {
-        const cached = this.cache.get(CACHE_MODEL_KEY);
+        const cached = this.cache.get(this.cacheDataKey);
         if (!cached) {
             return null;
         }
 
-        const isExpired = Date.now() - cached.timestamp > CACHE_LIFETIME * 24 * 60 * 60 * 1000; // Conversion from days to milliseconds.
+        const age = Date.now() - cached.timestamp;
+        const maxAge = this.cacheLifetimeDays * 24 * 60 * 60 * 1000;
+        const isExpired = age > maxAge;
         if (isExpired) {
-            this.cache.delete(CACHE_MODEL_KEY);
+            this.cache.delete(this.cacheDataKey);
             this.clearGlobalState();
             return null;
         }
@@ -173,7 +207,7 @@ class ModelCache<T> {
     set(data: T[]): void {
         const timestamp = Date.now();
 
-        this.cache.set(CACHE_MODEL_KEY, {
+        this.cache.set(this.cacheDataKey, {
             data,
             timestamp
         });
@@ -191,15 +225,26 @@ const CACHE_MODEL_KEY = 'vertec.cache.modeldata';
 const CACHE_TRANSLATION_KEY = 'vertec.cache.translationdata';
 const CACHE_TIMESTAMP_KEY = 'vertec.cache.timestamp';
 const CACHE_LIFETIME = vscode.workspace.getConfiguration("vertecVscodeExtension").get("CacheLifetime", 30);
-const MODEL_CACHE = new ModelCache<unknown>();
+const MODEL_CACHE = new DataCache<unknown>(
+    CACHE_MODEL_KEY,
+    CACHE_TIMESTAMP_KEY,
+    CACHE_LIFETIME
+);
+
+const TRANSLATIONS_CACHE = new DataCache<unknown>(
+    CACHE_TRANSLATION_KEY,
+    CACHE_TIMESTAMP_KEY,
+    CACHE_LIFETIME
+);
 
 
 /**
- * Initionizes the model cache with the given extension context.
- * Must be called in the activate function of the extension to enable caching for the Model Browser data.
+ * Initializes both caches with the given extension context.
+ * Must be called in the activate function of the extension to enable caching
  */
-export function initializeModelCache(context: vscode.ExtensionContext): void {
+export function initializeCaches(context: vscode.ExtensionContext): void {
     MODEL_CACHE.initialize(context);
+    TRANSLATIONS_CACHE.initialize(context);
 }
 
 /**
@@ -210,7 +255,7 @@ export function initializeModelCache(context: vscode.ExtensionContext): void {
 export async function getModel<T = unknown>(
     forceRefresh: boolean
 ): Promise<T[]> {
-    const baseUrl = vscode.workspace.getConfiguration("vertecVscodeExtension").get("ModelUrl", "");
+    const modelUrl = vscode.workspace.getConfiguration("vertecVscodeExtension").get("ModelUrl", "");
 
     // must we use the cache?
     if (!forceRefresh) {
@@ -219,18 +264,21 @@ export async function getModel<T = unknown>(
             console.log('Data loaded from cache.');
             return cachedData;
         }
+        console.log('No cache found, fetching from URL.');
+    } else {
+        console.log('Fetching from URL.');
     }
 
     const allResults: T[] = [];
-    let currentUrl: string | null = baseUrl;
+    let currentUrl: string | null = modelUrl;
     let pageCount = 0;
 
     try {
-        // Show progess to user, because backend is kinda slow.
+        // Show progress to user, because backend is kinda slow.
         await vscode.window.withProgress(
             {
                 location: vscode.ProgressLocation.Notification,
-                title: 'Loading Model Browser data',
+                title: 'Loading model data',
                 cancellable: false
             },
             async (progress) => {
@@ -246,7 +294,7 @@ export async function getModel<T = unknown>(
                     // Merge results
                     allResults.push(...response.data.results);
 
-                    // Set net url
+                    // Set next url
                     currentUrl = response.data.next;
 
                     console.log(`Page ${pageCount} loaded: ${response.data.results.length} entries.`);
@@ -278,7 +326,29 @@ export async function getModel<T = unknown>(
  */
 export function clearModelCache(): void {
     MODEL_CACHE.clear();
-    vscode.window.showInformationMessage('Cleared Model Browser cache.');
+    vscode.window.showInformationMessage('Model cache cleared.');
+}
+
+
+/**
+ * Reloads the model data by clearing the cache and fetching the data again from the API.
+ */
+export async function reloadModel() {
+    try {
+        // Empty cache
+        clearModelCache();
+
+        // Reload Model Browser and force refresh cache.
+        const classes = await getModel<VertecClass>(true);
+
+        vscode.window.showInformationMessage(
+            `Reloaded ${classes.length} classes!`
+        );
+
+    } catch (error) {
+        console.error('Error loading the data:', error);
+        vscode.window.showErrorMessage('An error occured while loading the model data.');
+    }
 }
 
 /**
@@ -338,46 +408,90 @@ export function resolveInheritance(
     };
 }
 
+/**
+ * Loads translation data from the API (simple JSON file)
+ * @param forceRefresh If true, ignores cache and reloads data
+ */
+export async function getTranslations<T = unknown>(
+    forceRefresh: boolean
+): Promise<T[]> {
+    const translationsUrl = vscode.workspace.getConfiguration("vertecVscodeExtension").get("TranslationsUrl", "");
+
+    // must we use the cache?
+    if (!forceRefresh) {
+        const cachedData = TRANSLATIONS_CACHE.get() as unknown as T[] | null;
+        if (cachedData) {
+            console.log('Data loaded from cache.');
+            return cachedData;
+        }
+        console.log('No cache found, fetching from URL.');
+    } else {
+        console.log('Fetching from URL.');
+    }
+
+    const translationData: T[] = [];
+
+    try {
+        // Show progress to user.
+        await vscode.window.withProgress(
+            {
+                location: vscode.ProgressLocation.Notification,
+                title: 'Loading translation data',
+                cancellable: false
+            },
+            async (progress) => {
+                progress.report({ message: 'Downloading file ...' });
+
+                const response = await axios.get<TranslationApiResponse<T>>(translationsUrl);
+
+                translationData.push(...response.data);
+
+                console.log(`Translation data loaded: ${translationData.length} entries`);
+
+                progress.report({ message: 'All done!' });
+            }
+        );
+
+        // Store data in cache (cache typed as unknown[])
+        TRANSLATIONS_CACHE.set(translationData);
+
+        return translationData;
+
+    } catch (error) {
+        if (axios.isAxiosError(error)) {
+            const errorMsg = `API error: ${error.message}`;
+            vscode.window.showErrorMessage(errorMsg);
+            throw new Error(errorMsg);
+        }
+        throw error;
+    }
+}
+
+/**
+ * Clears the translations cache
+ */
+export function clearTranslationsCache(): void {
+    TRANSLATIONS_CACHE.clear();
+    vscode.window.showInformationMessage('Translation cache cleared.');
+}
 
 /**
  * Reloads the translation data by clearing the cache and fetching the data again from the API.
  */
 export async function reloadTranslations() {
     try {
-        return;  // TODO
         // Empty cache
         clearTranslationsCache();
 
-        // Reload Model Browser and force refresh cache.
-        const translations = await getTranslations<VertecClass>(true);
+        // Reload translations and force refresh cache.
+        const translations = await getTranslations<VertecTranslation>(true);
 
         vscode.window.showInformationMessage(
-            `Cache cleared and reloaded ${translations.length} translations!`
+            `Reloaded ${translations.length} translations!`
         );
 
     } catch (error) {
         console.error('Error loading the data:', error);
         vscode.window.showErrorMessage('An error occured while loading the translations data.');
-    }
-}
-
-/**
- * Reloads the model data by clearing the cache and fetching the data again from the API.
- */
-export async function reloadModel() {
-    try {
-        // Empty cache
-        clearModelCache();
-
-        // Reload Model Browser and force refresh cache.
-        const classes = await getModel<VertecClass>(true);
-
-        vscode.window.showInformationMessage(
-            `Cache cleared and reloaded ${classes.length} classes!`
-        );
-
-    } catch (error) {
-        console.error('Error loading the data:', error);
-        vscode.window.showErrorMessage('An error occured while loaded the Model Browser data.');
     }
 }

@@ -5,12 +5,12 @@
 
 import { commands, ExtensionContext } from 'vscode';
 import { translateClass, translateMember, translateText } from './Translator';
-import { initializeModelCache, reloadModel, reloadTranslations } from './DataProvider';
+import { initializeCaches, reloadModel, reloadTranslations } from './DataProvider';
 import { modelBrowse } from './ModelBrowser';
 
 export function activate(context: ExtensionContext) {
 	// Initialize the model cache with the extension context
-    initializeModelCache(context);
+    initializeCaches(context);
 
 	// Vertec: Caches
 	commands.registerCommand('vertec.reload.model', () => reloadModel());
