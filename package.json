@@ -1,14 +1,14 @@
 {
-	"name": "vtc-translation",
-	"displayName": "Vertec Translation",
-	"description": "Provides methods to access and replace Vertec translations",
-	"version": "0.0.1",
-	"publisher": "Vertec",
+	"name": "vertec.vscode.extension",
+	"displayName": "Vertec Visual Studio Code extension",
+	"description": "This is a simple extension to provide usefull utilities for the day to day Vertec administrator.",
+	"version": "1.0.0",
+	"publisher": "Christian Bruns - Vertec Gmbh",
 	"private": true,
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/xxx"
+		"url": "https://github.com/cbc-technology/vertec.vscode.extension"
 	},
 	"engines": {
 		"vscode": "^1.73.0"
@@ -17,38 +17,69 @@
 		"Other"
 	],
 	"activationEvents": [
-		"onCommand:vertec.translator"
+		"onCommand:vertec.vscode.extension"
 	],
 	"main": "./out/extension.js",
 	"contributes": {
 		"commands": [
 			{
-				"command": "vertec.translateText",
+				"command": "vertec.translator.text",
 				"title": "Vertec: Translate text"
 			},
 			{
-				"command": "vertec.translateClass",
+				"command": "vertec.translator.class",
 				"title": "Vertec: Translate class"
 			},
 			{
-				"command": "vertec.translateMember",
+				"command": "vertec.translator.member",
 				"title": "Vertec: Translate member"
+			},
+			{
+				"command": "vertec.modelbrowser.browse",
+				"title": "Vertec: Browse Model"
+			},
+			{
+				"command": "vertec.reload.model",
+				"title": "Vertec: Reload model cache"
+			},
+			{
+				"command": "vertec.reload.translations",
+				"title": "Vertec: Reload translation cache"
+			}
+		],
+		"keybindings": [
+			{
+				"command": "workbench.action.closeActiveEditor",
+				"key": "escape",
+				"when": "activeWebviewPanelId == 'vertecMemberAssociationDetails'"
 			}
 		],
 		"configuration": {
-			"title": "Vertec Translator",
+			"title": "Vertec Visual Studio Code extension",
 			"type": "object",
 			"properties": {
-				"vertecTranslator.ClassesAndMembersJsonPath": {
-				"type": "string",
-				"description": "Path to the classes and members JSON file."
+				"vertecVscodeExtension.ClassesMembersUrl": {
+					"type": "string",
+					"default": "https://downloads.vertec.com/temp/CBR/VTC%20ClassesMembers.json",
+					"description": "URL to the classes and members JSON file."
 				},
-				"vertecTranslator.TranslationsJsonPath": {
-				"type": "string",
-				"description": "Path to the translations JSON file."
+				"vertecVscodeExtension.TranslationsUrl": {
+					"type": "string",
+					"default": "https://downloads.vertec.com/downloads/Translations.json",
+					"description": "URL to the translations JSON file."
+				},
+				"vertecVscodeExtension.ModelUrl": {
+					"type": "string",
+					"default": "https://www.vertec.com/api/erp-model-browser/get-classes",
+					"description": "URL to the model browser backend."
+				},
+				"vertecVscodeExtension.CacheLifetime": {
+					"type": "number",
+					"default": 30,
+					"description": "Cache lifetime (in days)."
 				}
 			}
-			}
+		}
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
@@ -64,5 +95,8 @@
 		"eslint": "^9.13.0",
 		"typescript": "^5.8.2",
 		"typescript-eslint": "^8.26.0"
-	}
+	},
+	"dependencies": {
+    	"axios": "^1.6.5"
+  	}
 }

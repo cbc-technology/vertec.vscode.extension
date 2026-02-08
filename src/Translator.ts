@@ -13,11 +13,11 @@ import * as vscode from 'vscode';
  * This first part uses the helper class `Translator` that wraps the API for the multi-step case.
  */
 
-const title = 'Vertec class and member translator';
+const title = 'Vertec Visual Studio Code extension';
 const languages = ['Englisch', 'Deutsch'];
 const tasks = ['Copy value', 'Insert value'];
 
-export async function pickClassName() {
+export async function translateClass() {
 	// Select classname
 	const classname = await window.showQuickPick(
 		getClassesAndMembersJsonFile('class'),
@@ -65,7 +65,7 @@ export async function pickClassName() {
 	}
 }
 
-export async function pickMemberName() {
+export async function translateMember() {
 	// Select membername
 	const membername = await window.showQuickPick(
 		getClassesAndMembersJsonFile('member'),
@@ -113,7 +113,7 @@ export async function pickMemberName() {
 	}
 }
 
-export async function pickText() {
+export async function translateText() {
 	// Select membername
 	const membername = await window.showQuickPick(
 		getTranslationsJsonFile(),
@@ -183,7 +183,7 @@ async function pickTask() {
 
 async function getClassesAndMembersJsonFile(type: string): Promise<QuickPickItem[]> {
 	let jsonString = "";
-	const path = vscode.workspace.getConfiguration("vertecTranslator").get("ClassesAndMembersJsonPath", "");
+	const path = vscode.workspace.getConfiguration("vertecVscodeExtension").get("ClassesMembersUrl", "");
 	if (path === '') {
 		window.showWarningMessage('No JSON file path found in the settings. Please specify file path.');
 		return [].map(label => ({ label }));
@@ -218,7 +218,7 @@ async function getClassesAndMembersJsonFile(type: string): Promise<QuickPickItem
 
 async function getTranslationsJsonFile(): Promise<QuickPickItem[]> {
 	let jsonString = "";
-	const path = vscode.workspace.getConfiguration("vertecTranslator").get("TranslationsJsonPath", "");
+	const path = vscode.workspace.getConfiguration("vertecVscodeExtension").get("TranslationsUrl", "");
 	if (path === '') {
 		window.showWarningMessage('No JSON file path found in the settings. Please specify file path.');
 		return [].map(label => ({ label }));
