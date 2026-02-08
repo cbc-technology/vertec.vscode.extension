@@ -8,10 +8,6 @@ interface ModelApiResponse<T> {
     results: T[];
 }
 
-interface TranslationApiResponse<T> {
-    data: T[];
-}
-
 interface VertecMember {
     name: string;
     name_alt: string;
@@ -429,7 +425,7 @@ export async function getTranslations<T = unknown>(
         console.log('Fetching from URL.');
     }
 
-    const translationData: T[] = [];
+    let translationData: T[] = [];
 
     try {
         // Show progress to user.
@@ -442,9 +438,9 @@ export async function getTranslations<T = unknown>(
             async (progress) => {
                 progress.report({ message: 'Downloading file ...' });
 
-                const response = await axios.get<TranslationApiResponse<T>>(translationsUrl);
+                const response = await axios.get<T[]>(translationsUrl);
 
-                translationData.push(...response.data);
+                translationData = response.data;
 
                 console.log(`Translation data loaded: ${translationData.length} entries`);
 
