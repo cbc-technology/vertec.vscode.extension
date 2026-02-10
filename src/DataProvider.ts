@@ -267,7 +267,8 @@ export async function getModel<T = unknown>(
 
     const allResults: T[] = [];
     let currentUrl: string | null = modelUrl;
-    let pageCount = 0;
+    let objectCount = 0;
+    let totalCount = 0;
 
     try {
         // Show progress to user, because backend is kinda slow.
@@ -279,28 +280,38 @@ export async function getModel<T = unknown>(
             },
             async (progress) => {
                 while (currentUrl) {
-                    pageCount++;
-                    progress.report({
-                        message: `Page ${pageCount}`,
-                        increment: pageCount === 1 ? 0 : undefined
-                    });
+                    if (totalCount === 0) {
+                        progress.report({ message: 'Loading first page' });
+                    }
 
                     const response = await axios.get<ModelApiResponse<T>>(currentUrl);
 
+                    // Set total count on first page load
+                    if (totalCount === 0) {
+                        totalCount = response.data.count;
+                    }
+
                     // Merge results
+                    objectCount += response.data.results.length;
                     allResults.push(...response.data.results);
 
                     // Set next url
                     currentUrl = response.data.next;
 
-                    console.log(`Page ${pageCount} loaded: ${response.data.results.length} entries.`);
+                    // Display progress
+                    const message = `${objectCount} of ${totalCount} entries loaded `;
+                    progress.report({
+                        message: message,
+                        increment: (response.data.results.length / totalCount * 100.0)
+                    });
+                    console.log(message);
                 }
 
                 progress.report({ message: 'All done!' });
             }
         );
 
-        console.log(`Loaded ${allResults.length} entries in total from ${pageCount} pages.`);
+        console.log(`Loaded ${allResults.length} entries in total`);
 
         // Store data in cache (cache typed as unknown[])
         MODEL_CACHE.set(allResults);
@@ -436,7 +447,7 @@ export async function getTranslations<T = unknown>(
                 cancellable: false
             },
             async (progress) => {
-                progress.report({ message: 'Downloading file ...' });
+                progress.report({ message: 'Downloading file' });
 
                 const response = await axios.get<T[]>(translationsUrl);
 
