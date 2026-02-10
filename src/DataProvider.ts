@@ -23,13 +23,16 @@ interface VertecAssociation {
     name: string;
     name_alt: string;
     perceived_name: string;
+    perceived_name_alt?: string;
     association_class: VertecClassRef;
     description?: string;
     is_derived?: boolean
     role1_class?: VertecClassRef;
     role2_class?: VertecClassRef;
     role1_name?: string;
+    role1_name_alt?: string;
     role2_name?: string;
+    role2_name_alt?: string;
     is_role1_navigable?: boolean;
     is_role2_navigable?: boolean;
     is_role1_multi?: boolean;
@@ -291,9 +294,18 @@ export async function getModel<T = unknown>(
                         totalCount = response.data.count;
                     }
 
+                    // Normalisiere die Daten, falls es VertecClass-Objekte sind
+                    const normalizedResults = response.data.results.map(item => {
+                        // Type guard: Prüfe ob es ein VertecClass-Objekt ist
+                        if (isVertecClass(item)) {
+                            return normalizeVertecClass(item) as unknown as T;
+                        }
+                        return item;
+                    });
+
                     // Merge results
-                    objectCount += response.data.results.length;
-                    allResults.push(...response.data.results);
+                    objectCount += normalizedResults.length;
+                    allResults.push(...normalizedResults);
 
                     // Set next url
                     currentUrl = response.data.next;
@@ -326,6 +338,59 @@ export async function getModel<T = unknown>(
         }
         throw error;
     }
+}
+
+/**
+ * Helper function to normalize VertecMember by converting name and name_alt to lowercase.
+ */
+function normalizeVertecMember(member: VertecMember): VertecMember {
+    return {
+        ...member,
+        name: member.name.toLowerCase(),
+        name_alt: member.name_alt.toLowerCase()
+    };
+}
+
+/**
+ * Helper function to normalize VertecAssociation by converting name, name_alt and perceived_name to lowercase.
+ */
+function normalizeVertecAssociation(assoc: VertecAssociation): VertecAssociation {
+    return {
+        ...assoc,
+        name: assoc.name.toLowerCase(),
+        name_alt: assoc.name_alt.toLowerCase(),
+        perceived_name: assoc.perceived_name.toLowerCase(),
+        perceived_name_alt: assoc.perceived_name_alt?.toLowerCase(),
+        role1_name: assoc.role1_name?.toLowerCase(),
+        role1_name_alt: assoc.role1_name_alt?.toLowerCase(),
+        role2_name: assoc.role2_name?.toLowerCase(),
+        role2_name_alt: assoc.role2_name_alt?.toLowerCase(),
+    };
+}
+
+/**
+ * Helper function to normalize VertecClass by converting its members and associations.
+ */
+function normalizeVertecClass(vertecClass: VertecClass): VertecClass {
+    return {
+        ...vertecClass,
+        // name und name_alt bleiben unverändert für VertecClass
+        members: vertecClass.members?.map(normalizeVertecMember),
+        associations: vertecClass.associations?.map(normalizeVertecAssociation)
+    };
+}
+
+/**
+ * Checks if something is a VertecClass.
+ */
+function isVertecClass(obj: unknown): obj is VertecClass {
+    return (
+        typeof obj === 'object' &&
+        obj !== null &&
+        'class_id' in obj &&
+        'name' in obj &&
+        'name_alt' in obj
+    );
 }
 
 /**

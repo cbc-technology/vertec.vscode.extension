@@ -86,7 +86,7 @@ async function showClassDetails(vertecClass: VertecClass, allClasses: VertecClas
         members.forEach(member => {
             if (member.sourceClass === vertecClass.name || member.sourceClass === vertecClass.name_alt) {
                 items.push({
-                    label: `${member.name.toLowerCase()} | ${member.name_alt.toLowerCase()}`,
+                    label: `${member.name} | ${member.name_alt}`,
                     description: `${member.member_type} | Length: ${member.length}`,
                     detail: `${member.description || '-/-'} | Persistent: ${member.is_derived ? 'No' : 'Yes'} | Nullable: ${member.is_nullable ? 'Yes' : 'No'} | Indexed: ${member.is_indexed ? 'Yes' : 'No'}`,
                     data: member
@@ -102,7 +102,7 @@ async function showClassDetails(vertecClass: VertecClass, allClasses: VertecClas
         members.forEach(member => {
             if (member.sourceClass !== vertecClass.name && member.sourceClass !== vertecClass.name_alt) {
                 items.push({
-                    label: `${member.name.toLowerCase()} | ${member.name_alt.toLowerCase()}`,
+                    label: `${member.name} | ${member.name_alt}`,
                     description: `${member.member_type} | Length: ${member.length} (from ${member.sourceClass})`,
                     detail: `${member.description || '-/-'} | Persistent: ${member.is_derived ? 'No' : 'Yes'} | Nullable: ${member.is_nullable ? 'Yes' : 'No'} | Indexed: ${member.is_indexed ? 'Yes' : 'No'}`,
                     data: member
@@ -127,7 +127,7 @@ async function showClassDetails(vertecClass: VertecClass, allClasses: VertecClas
                 const role_multi = assoc[`is_role${roletype}_multi`];
 
                 items.push({
-                    label: `${assoc.perceived_name.toLowerCase()}`,
+                    label: `${assoc.perceived_name} | ${assoc.perceived_name_alt}`,
                     description: `Link class: ${assoc.association_class?.name || '-/-'}`,
                     detail: `${role_description || '-/-'} | Class: ${role_class?.name || '-/-'} | Persistent: ${assoc.is_derived ? 'No' : 'Yes'} | Multi: ${role_multi ? 'Yes' : 'No'}`,
                     data: assoc
@@ -148,8 +148,8 @@ async function showClassDetails(vertecClass: VertecClass, allClasses: VertecClas
                 const role_multi = assoc[`is_role${roletype}_multi`];
 
                 items.push({
-                    label: `${assoc.perceived_name.toLowerCase()} (from ${assoc.sourceClass})`,
-                    description: `Link class: ${assoc.association_class?.name || '-/-'}`,
+                    label: `${assoc.perceived_name} | ${assoc.perceived_name_alt}`,
+                    description: `Link class: ${assoc.association_class?.name || '-/-'} (from ${assoc.sourceClass})`,
                     detail: `${role_description || '-/-'} | Class: ${role_class?.name || '-/-'} | Persistent: ${assoc.is_derived ? 'No' : 'Yes'} | Multi: ${role_multi ? 'Yes' : 'No'}`,
                     data: assoc
                 });
@@ -410,7 +410,7 @@ function getAssociationDetailHtml(assoc: EnrichedVertecAssociation): string {
     <body>
         <button class="back-button" onclick="goBack()">← Back to Members/Associations</button>
 
-        <h1>Association: ${assoc.perceived_name || ''} (${assoc.name || ''} | ${assoc.name_alt || ''})</h1>
+        <h1>Association: ${assoc.perceived_name || ''} | ${assoc.perceived_name_alt || ''}</h1>
 
         <div class="section">
             <h2>Description</h2>
@@ -461,8 +461,8 @@ function getAssociationDetailHtml(assoc: EnrichedVertecAssociation): string {
                     </tr>
                     <tr>
                         <td>Name</td>
-                        <td>${assoc.role1_name || '-/-'}</td>
-                        <td>${assoc.role2_name || '-/-'}</td>
+                        <td>${assoc.role1_name || '-/-'} | ${assoc.role1_name_alt || '-/-'}</td>
+                        <td>${assoc.role2_name || '-/-'} | ${assoc.role1_name_alt || '-/-'}</td>
                     </tr>
                     <tr>
                         <td>Description</td>

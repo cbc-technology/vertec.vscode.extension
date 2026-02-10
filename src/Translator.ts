@@ -58,13 +58,22 @@ class MemberQuickPickItem implements QuickPickItem {
 	description: string;
 	detail: string;
 
-	constructor(memberOrAssociation: EnrichedVertecMember | EnrichedVertecAssociation) {
-		this.label = memberOrAssociation.name;
+	constructor(member: EnrichedVertecMember) {
+		this.label = member.name;
 		this.description = '';
-		this.detail = memberOrAssociation.name_alt || memberOrAssociation.name;
+		this.detail = member.name_alt;
+	}
+}
 
-		this.label = this.label.toLowerCase();
-		this.detail = this.detail.toLowerCase();
+class AssociationQuickPickItem implements QuickPickItem {
+	label: string;
+	description: string;
+	detail: string;
+
+	constructor(association: EnrichedVertecAssociation) {
+		this.label = association.perceived_name;
+		this.description = '';
+		this.detail = association.perceived_name_alt || association.perceived_name;
 	}
 }
 
@@ -218,7 +227,7 @@ export async function translateMember() {
 		}
 
 		// Create quick pick items for all members and associations of all classes.
-		const memberQuickPickItems: MemberQuickPickItem[] = [];
+		const memberQuickPickItems: QuickPickItem[] = [];
 		classes.forEach(vertecclass => {
 			if (vertecclass.members) {
 				vertecclass.members.forEach(member => {
@@ -227,7 +236,7 @@ export async function translateMember() {
 			}
 			if (vertecclass.associations) {
 				vertecclass.associations.forEach(association => {
-					memberQuickPickItems.push(new MemberQuickPickItem(association));
+					memberQuickPickItems.push(new AssociationQuickPickItem(association));
 				});
 			}
 		});
