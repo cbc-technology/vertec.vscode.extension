@@ -456,13 +456,13 @@ function getAssociationDetailHtml(assoc: EnrichedVertecAssociation): string {
                 <tbody>
                     <tr>
                         <td>Class</td>
-                        <td>${assoc.role1_class?.name || '-/-'}</td>
-                        <td>${assoc.role2_class?.name || '-/-'}</td>
+                        <td>${assoc.role1_class?.name || '-/-'} | ${assoc.role1_class_alt?.name || '-/-'}</td>
+                        <td>${assoc.role2_class?.name || '-/-'} | ${assoc.role2_class_alt?.name || '-/-'}</td>
                     </tr>
                     <tr>
                         <td>Name</td>
                         <td>${assoc.role1_name || '-/-'} | ${assoc.role1_name_alt || '-/-'}</td>
-                        <td>${assoc.role2_name || '-/-'} | ${assoc.role1_name_alt || '-/-'}</td>
+                        <td>${assoc.role2_name || '-/-'} | ${assoc.role2_name_alt || '-/-'}</td>
                     </tr>
                     <tr>
                         <td>Description</td>

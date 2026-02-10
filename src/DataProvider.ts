@@ -28,10 +28,12 @@ interface VertecAssociation {
     description?: string;
     is_derived?: boolean
     role1_class?: VertecClassRef;
+    role1_class_alt?: VertecClassRef;
     role2_class?: VertecClassRef;
-    role1_name?: string;
+    role2_class_alt?: VertecClassRef;
+    role1_name: string;
     role1_name_alt?: string;
-    role2_name?: string;
+    role2_name: string;
     role2_name_alt?: string;
     is_role1_navigable?: boolean;
     is_role2_navigable?: boolean;
@@ -268,67 +270,25 @@ export async function getModel<T = unknown>(
         console.log('Fetching from URL.');
     }
 
-    const allResults: T[] = [];
-    let currentUrl: string | null = modelUrl;
-    let objectCount = 0;
-    let totalCount = 0;
-
     try {
-        // Show progress to user, because backend is kinda slow.
-        await vscode.window.withProgress(
-            {
-                location: vscode.ProgressLocation.Notification,
-                title: 'Loading model data',
-                cancellable: false
-            },
-            async (progress) => {
-                while (currentUrl) {
-                    if (totalCount === 0) {
-                        progress.report({ message: 'Loading first page' });
-                    }
+        // Lade zuerst das deutsche Modell
+        const germanResults = await loadModelFromUrl<T>(modelUrl, 'de');
 
-                    const response = await axios.get<ModelApiResponse<T>>(currentUrl);
+        // Lade dann das englische Modell (nur für perceived_name_alt)
+        const englishModelUrl = modelUrl.includes('?')
+            ? `${modelUrl}&lang=en-ch`
+            : `${modelUrl}?lang=en-ch`;
+        const englishResults = await loadModelFromUrl<T>(englishModelUrl, 'en');
 
-                    // Set total count on first page load
-                    if (totalCount === 0) {
-                        totalCount = response.data.count;
-                    }
+        // Merge die perceived_name Werte aus dem englischen Modell
+        const mergedResults = mergeEnglishPerceivedNames(germanResults, englishResults);
 
-                    // Normalisiere die Daten, falls es VertecClass-Objekte sind
-                    const normalizedResults = response.data.results.map(item => {
-                        // Type guard: Prüfe ob es ein VertecClass-Objekt ist
-                        if (isVertecClass(item)) {
-                            return normalizeVertecClass(item) as unknown as T;
-                        }
-                        return item;
-                    });
-
-                    // Merge results
-                    objectCount += normalizedResults.length;
-                    allResults.push(...normalizedResults);
-
-                    // Set next url
-                    currentUrl = response.data.next;
-
-                    // Display progress
-                    const message = `${objectCount} of ${totalCount} entries loaded `;
-                    progress.report({
-                        message: message,
-                        increment: (response.data.results.length / totalCount * 100.0)
-                    });
-                    console.log(message);
-                }
-
-                progress.report({ message: 'All done!' });
-            }
-        );
-
-        console.log(`Loaded ${allResults.length} entries in total`);
+        console.log(`Loaded ${mergedResults.length} entries in total`);
 
         // Store data in cache (cache typed as unknown[])
-        MODEL_CACHE.set(allResults);
+        MODEL_CACHE.set(mergedResults);
 
-        return allResults;
+        return mergedResults;
 
     } catch (error) {
         if (axios.isAxiosError(error)) {
@@ -338,6 +298,138 @@ export async function getModel<T = unknown>(
         }
         throw error;
     }
+}
+
+/**
+ * Loads model data from a specified URL with progress indication
+ */
+async function loadModelFromUrl<T>(modelUrl: string, language: 'de' | 'en'): Promise<T[]> {
+
+    const allResults: T[] = [];
+    let currentUrl: string | null = modelUrl;
+    let objectCount = 0;
+    let totalCount = 0;
+
+    // Show progress to user, because backend is kinda slow.
+    await vscode.window.withProgress(
+        {
+            location: vscode.ProgressLocation.Notification,
+            title: `Loading ${language === 'de' ? 'german' : 'english'} model data`,
+            cancellable: false
+        },
+        async (progress) => {
+            while (currentUrl) {
+                if (totalCount === 0) {
+                    progress.report({ message: 'Loading first page' });
+                }
+
+                const response = await axios.get<ModelApiResponse<T>>(currentUrl);
+
+                // Set total count on first page load
+                if (totalCount === 0) {
+                    totalCount = response.data.count;
+                }
+
+                // Normalisiere die Daten, falls es VertecClass-Objekte sind
+                const normalizedResults = language === 'de'
+                    ? response.data.results.map(item => {
+                    // Type guard: Prüfe ob es ein VertecClass-Objekt ist
+                    if (isVertecClass(item)) {
+                        return normalizeVertecClass(item) as unknown as T;
+                    }
+                    return item;
+                })
+                : response.data.results;
+
+                // Merge results
+                objectCount += normalizedResults.length;
+                allResults.push(...normalizedResults);
+
+                // Set next url
+                currentUrl = response.data.next;
+
+                // Display progress
+                const message = `${objectCount} of ${totalCount} entries loaded`;
+                progress.report({
+                    message: message,
+                    increment: (normalizedResults.length / totalCount * 100.0)
+                });
+                console.log(message);
+            }
+
+            progress.report({ message: 'All done!' });
+        }
+    );
+
+    return allResults;
+}
+
+/**
+ * Merges the perceived_name from English model into perceived_name_alt of German model
+ */
+function mergeEnglishPerceivedNames<T>(germanResults: T[], englishResults: T[]): T[] {
+
+    // Erstelle eine Map für schnelleren Zugriff auf englische Klassen
+    const englishClassMap = new Map<number, VertecClass>();
+
+    englishResults.forEach(item => {
+        if (isVertecClass(item)) {
+            englishClassMap.set(item.class_id, item);
+        }
+    });
+
+    const result = germanResults.map(item => {
+        if (!isVertecClass(item)) {
+            return item;
+        }
+
+        const germanClass = item as VertecClass;
+        const englishClass = englishClassMap.get(germanClass.class_id);
+
+        if (!englishClass) {
+            return item;
+        }
+
+        if (!germanClass.associations || germanClass.associations.length === 0) {
+            return item;
+        }
+
+        if (!englishClass.associations || englishClass.associations.length === 0) {
+            return item;
+        }
+
+        // Erstelle eine Map der englischen Associations basierend auf ihrem Namen
+        const englishAssocMap = new Map<string, VertecAssociation>();
+        englishClass.associations.forEach(assoc => {
+            englishAssocMap.set(assoc.name.toLowerCase(), assoc);
+        });
+
+        // Merge perceived_name_alt
+        const updatedAssociations = germanClass.associations.map(germanAssoc => {
+            const englishAssoc = englishAssocMap.get(germanAssoc.name);
+
+            if (englishAssoc) {
+
+                return {
+                    ...germanAssoc,
+                    perceived_name_alt: englishAssoc.perceived_name.toLowerCase(),
+                    role1_name_alt: englishAssoc.role1_name.toLowerCase(),
+                    role2_name_alt: englishAssoc.role2_name.toLowerCase(),
+                    role1_class_alt: englishAssoc.role1_class,
+                    role2_class_alt: englishAssoc.role2_class,
+                };
+            }
+
+            return germanAssoc;
+        });
+
+        return {
+            ...germanClass,
+            associations: updatedAssociations
+        } as unknown as T;
+    });
+
+    return result;
 }
 
 /**
