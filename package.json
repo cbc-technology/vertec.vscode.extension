@@ -1,8 +1,8 @@
 {
 	"name": "vertec-vscode-extension",
-	"displayName": "Vertec Visual Studio Code extension",
+	"displayName": "Vertec Extension",
 	"description": "This is a simple extension to provide usefull utilities for the day to day Vertec administrator.",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"private": true,
 	"license": "MIT",
 	"repository": {
@@ -58,14 +58,9 @@
 			}
 		],
 		"configuration": {
-			"title": "Vertec Visual Studio Code extension",
+			"title": "Vertec extension",
 			"type": "object",
 			"properties": {
-				"vertecVscodeExtension.ClassesMembersUrl": {
-					"type": "string",
-					"default": "https://downloads.vertec.com/temp/CBR/VTC%20ClassesMembers.json",
-					"description": "URL to the classes and members JSON file."
-				},
 				"vertecVscodeExtension.TranslationsUrl": {
 					"type": "string",
 					"default": "https://downloads.vertec.com/downloads/Translations.json",
