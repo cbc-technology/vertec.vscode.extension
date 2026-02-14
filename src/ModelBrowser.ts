@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import { VertecClass, EnrichedVertecMember, EnrichedVertecAssociation, getModel, resolveInheritance } from './DataProvider';
 
-
 /**
  * Show the model browser.
  */

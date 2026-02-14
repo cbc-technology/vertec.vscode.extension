@@ -38,6 +38,10 @@
 				"title": "Vertec: Browse Model"
 			},
 			{
+				"command": "vertec.comparator.compareClipboard",
+				"title": "Vertec: Compare with clipboard"
+			},
+			{
 				"command": "vertec.reload.model",
 				"title": "Vertec: Reload model cache"
 			},

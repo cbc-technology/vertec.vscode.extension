@@ -1,12 +1,8 @@
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-
 import { commands, ExtensionContext } from 'vscode';
 import { translateClass, translateMember, translateText } from './Translator';
 import { initializeCaches, reloadModel, reloadTranslations } from './DataProvider';
 import { modelBrowse } from './ModelBrowser';
+import { compareClipboard } from './Comparator';
 
 export function activate(context: ExtensionContext) {
 	// Initialize the model cache with the extension context
@@ -23,4 +19,7 @@ export function activate(context: ExtensionContext) {
 
 	// Vertec: Model Browser
 	commands.registerCommand('vertec.modelbrowser.browse', () => modelBrowse());
+
+	// Vertec: Comparator
+	commands.registerCommand('vertec.comparator.compareClipboard', () => compareClipboard());
 }
