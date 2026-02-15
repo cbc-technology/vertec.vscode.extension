@@ -1,6 +1,17 @@
 import * as vscode from 'vscode';
 import axios from 'axios';
 
+const MEMBERTYPE_TO_COMPLETIONKIND: Record<string, vscode.CompletionItemKind> = {
+    'class': vscode.CompletionItemKind.Class,
+    'vtcstring': vscode.CompletionItemKind.Field,
+    'mlstring': vscode.CompletionItemKind.Field,
+    'text': vscode.CompletionItemKind.Field,
+    'integer': vscode.CompletionItemKind.Field,
+    'boolean': vscode.CompletionItemKind.Field,
+    'date': vscode.CompletionItemKind.Field,
+    'blob': vscode.CompletionItemKind.Field,
+};
+
 interface ModelApiResponse<T> {
     count: number;
     next: string | null;
@@ -68,10 +79,12 @@ export interface VertecClass {
 
 export interface EnrichedVertecMember extends VertecMember {
     sourceClass?: string; // Name of the class from which the member originates.
+    completionKind: vscode.CompletionItemKind; // Type for completion item (e.g., property, method, etc.)
 }
 
 export interface EnrichedVertecAssociation extends VertecAssociation {
     sourceClass?: string; // Name of the class from which the association originates.
+    completionKind: vscode.CompletionItemKind; // Type for completion item (e.g., property, method, etc.)
 }
 
 export interface VertecTranslation {
@@ -246,6 +259,123 @@ const TRANSLATIONS_CACHE = new DataCache<unknown>(
 export function initializeCaches(context: vscode.ExtensionContext): void {
     MODEL_CACHE.initialize(context);
     TRANSLATIONS_CACHE.initialize(context);
+}
+
+/**
+ * Guesses the completion type for the member.
+ */
+function getCompletionKind(memberType?: string): vscode.CompletionItemKind {
+    const type = memberType?.toLowerCase() ?? '';
+    return MEMBERTYPE_TO_COMPLETIONKIND[type] ?? vscode.CompletionItemKind.Field;
+}
+
+
+/**
+ * Factory function to create the enriched member.
+ */
+export function createEnrichedVertecMember(
+    member: VertecMember,
+    sourceClass?: string
+): EnrichedVertecMember {
+    return {
+        ...member,
+        sourceClass,
+        completionKind: getCompletionKind(member.member_type)
+    };
+}
+
+
+/**
+ * Factory function to create the enriched association.
+ */
+export function createEnrichedVertecAssociation(
+    assoc: VertecAssociation,
+    sourceClass?: string
+): EnrichedVertecAssociation {
+    return {
+        ...assoc,
+        sourceClass,
+        completionKind: getCompletionKind('class')
+    };
+}
+
+/**
+ * Determines which role of an association applies based on the current class context,
+ * taking into account class inheritance hierarchy.
+ * Returns the TARGET role (where we navigate TO), not the source role.
+ */
+export function getAssociationRoleInfo(
+    assoc: EnrichedVertecAssociation,
+    currentClass: VertecClass,
+    allClasses: VertecClass[],
+    ownside = false,
+): {
+    role_name: string;
+    role_name_alt?: string;
+    role_description?: string;
+    role_class?: VertecClassRef;
+    role_class_alt?: VertecClassRef;
+    is_role_navigable?: boolean;
+    is_role_multi?: boolean;
+    is_role_composite?: boolean;
+    is_role_hidden?: boolean;
+} | null {
+    // Check if current class matches role1 or role2 (including inheritance)
+    const isRole1Side = isClassOrSubclass(
+        currentClass,
+        assoc.role1_class,
+        allClasses
+    ) || isClassOrSubclass(
+        currentClass,
+        assoc.role1_class_alt,
+        allClasses
+    );
+
+    const isRole2Side = isClassOrSubclass(
+        currentClass,
+        assoc.role2_class,
+        allClasses
+    ) || isClassOrSubclass(
+        currentClass,
+        assoc.role2_class_alt,
+        allClasses
+    );
+
+    let roletype: '1' | '2';
+    if (isRole1Side) {
+        roletype = '2';  // We are role1, return role2 (target)
+    } else if (isRole2Side) {
+        roletype = '1';  // We are role2, return role1 (target)
+    } else {
+        return null;
+    }
+
+    // Change roles if we would like to see our own side.
+    if (ownside) {
+        roletype = roletype === '1' ? '2' : '1';
+    }
+
+    const role_name = assoc[`role${roletype}_name`];
+    const role_name_alt = assoc[`role${roletype}_name_alt`];
+    const role_description = assoc[`role${roletype}_description`];
+    const role_class = assoc[`role${roletype}_class`];
+    const role_class_alt = assoc[`role${roletype}_class_alt`];
+    const is_role_navigable = assoc[`is_role${roletype}_navigable`];
+    const is_role_multi = assoc[`is_role${roletype}_multi`];
+    const is_role_composite = assoc[`is_role${roletype}_composite`];
+    const is_role_hidden = assoc[`is_role${roletype}_hidden`];
+
+    return {
+        role_name,
+        role_name_alt,
+        role_description,
+        role_class,
+        role_class_alt,
+        is_role_navigable,
+        is_role_multi,
+        is_role_composite,
+        is_role_hidden
+    };
 }
 
 /**
@@ -534,20 +664,20 @@ export function resolveInheritance(
         // Add members of the current class.
         if (currentClass.members) {
             currentClass.members.forEach(member => {
-                EnrichedVertecMembers.push({
-                    ...member,
-                    sourceClass: currentClass.name_alt || currentClass.name
-                });
+                EnrichedVertecMembers.push(createEnrichedVertecMember(
+                    member,
+                    currentClass.name_alt || currentClass.name
+                ));
             });
         }
 
         // Add associations of the current class.
         if (currentClass.associations) {
             currentClass.associations.forEach(assoc => {
-                EnrichedVertecAssociations.push({
-                    ...assoc,
-                    sourceClass: currentClass.name_alt || currentClass.name
-                });
+                EnrichedVertecAssociations.push(createEnrichedVertecAssociation(
+                    assoc,
+                    currentClass.name_alt || currentClass.name
+                ));
             });
         }
 
@@ -570,6 +700,36 @@ export function resolveInheritance(
         members: EnrichedVertecMembers,
         associations: EnrichedVertecAssociations
     };
+}
+
+/**
+ * Checks if a class is the same as or a subclass of the target class reference,
+ * following the inheritance hierarchy.
+ */
+function isClassOrSubclass(
+    currentClass: VertecClass,
+    targetClassRef: VertecClassRef | undefined,
+    allClasses: VertecClass[]
+): boolean {
+    if (!targetClassRef) {
+        return false;
+    }
+
+    if (currentClass.class_id === targetClassRef.class_id) {
+        return true;
+    }
+
+    if (currentClass.superclass) {
+        const superclass = allClasses.find(
+            cls => cls.class_id === currentClass.superclass!.class_id
+        );
+
+        if (superclass) {
+            return isClassOrSubclass(superclass, targetClassRef, allClasses);
+        }
+    }
+
+    return false;
 }
 
 /**

@@ -3,14 +3,23 @@ import { translateClass, translateMember, translateText } from './Translator';
 import { initializeCaches, reloadModel, reloadTranslations } from './DataProvider';
 import { modelBrowse } from './ModelBrowser';
 import { compareClipboard } from './Comparator';
+import { activateAutoCompletor } from './AutoCompletor';
+import { activateStubProvider, reloadStubs } from './StubProvider';
 
 export function activate(context: ExtensionContext) {
 	// Initialize the model cache with the extension context
     initializeCaches(context);
 
-	// Vertec: Caches
+	// Vertec: In-Memory Stub Provider
+	activateStubProvider(context);
+
+	// Vertec: Auto completion and hover information for Python files
+	activateAutoCompletor(context);
+
+	// Vertec: Caches and stubs
 	commands.registerCommand('vertec.reload.model', () => reloadModel());
 	commands.registerCommand('vertec.reload.translations', () => reloadTranslations());
+	commands.registerCommand('vertec.reload.stubs', () => reloadStubs());
 
 	// Vertec: Translator
 	commands.registerCommand('vertec.translator.class', () => translateClass());

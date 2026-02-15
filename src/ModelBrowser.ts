@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { VertecClass, EnrichedVertecMember, EnrichedVertecAssociation, getModel, resolveInheritance } from './DataProvider';
+import { VertecClass, EnrichedVertecMember, EnrichedVertecAssociation, getModel, resolveInheritance, getAssociationRoleInfo } from './DataProvider';
 
 /**
  * Show the model browser.
@@ -120,15 +120,13 @@ async function showClassDetails(vertecClass: VertecClass, allClasses: VertecClas
         });
         associations.forEach(assoc => {
             if (assoc.sourceClass === vertecClass.name || assoc.sourceClass === vertecClass.name_alt){
-                const roletype = assoc.role1_class?.name === assoc.sourceClass ? '1' : '2';
-                const role_description = assoc[`role${roletype}_description`];
-                const role_class = assoc[`role${roletype}_class`];
-                const role_multi = assoc[`is_role${roletype}_multi`];
+                const roleInfo1 = getAssociationRoleInfo(assoc, vertecClass, allClasses);
+                const roleInfo2 = getAssociationRoleInfo(assoc, vertecClass, allClasses, true);
 
                 items.push({
                     label: `${assoc.perceived_name} | ${assoc.perceived_name_alt}`,
-                    description: `Link class: ${assoc.association_class?.name || '-/-'}`,
-                    detail: `${role_description || '-/-'} | Class: ${role_class?.name || '-/-'} | Persistent: ${assoc.is_derived ? 'No' : 'Yes'} | Multi: ${role_multi ? 'Yes' : 'No'}`,
+                    description: `→ ${roleInfo1?.role_class?.name || '-/-'} | ${roleInfo1?.role_class_alt?.name || '-/-'}`,
+                    detail: `${roleInfo2?.role_description || '-/-'} | Link class: ${assoc.association_class?.name || '-/-'} | Persistent: ${assoc.is_derived ? 'No' : 'Yes'} | Multi: ${roleInfo2?.is_role_multi ? 'Yes' : 'No'}`,
                     data: assoc
                 });
             }
@@ -141,15 +139,13 @@ async function showClassDetails(vertecClass: VertecClass, allClasses: VertecClas
         });
         associations.forEach(assoc => {
             if (assoc.sourceClass !== vertecClass.name && assoc.sourceClass !== vertecClass.name_alt){
-                const roletype = assoc.role1_class?.name === assoc.sourceClass ? '1' : '2';
-                const role_description = assoc[`role${roletype}_description`];
-                const role_class = assoc[`role${roletype}_class`];
-                const role_multi = assoc[`is_role${roletype}_multi`];
+                const roleInfo1 = getAssociationRoleInfo(assoc, vertecClass, allClasses);
+                const roleInfo2 = getAssociationRoleInfo(assoc, vertecClass, allClasses, true);
 
                 items.push({
                     label: `${assoc.perceived_name} | ${assoc.perceived_name_alt}`,
-                    description: `Link class: ${assoc.association_class?.name || '-/-'} (from ${assoc.sourceClass})`,
-                    detail: `${role_description || '-/-'} | Class: ${role_class?.name || '-/-'} | Persistent: ${assoc.is_derived ? 'No' : 'Yes'} | Multi: ${role_multi ? 'Yes' : 'No'}`,
+                    description: `→ ${roleInfo1?.role_class?.name || '-/-'} | ${roleInfo1?.role_class_alt?.name || '-/-'} (from ${assoc.sourceClass})`,
+                    detail: `${roleInfo2?.role_description || '-/-'} | Link class: ${assoc.association_class?.name || '-/-'} | Persistent: ${assoc.is_derived ? 'No' : 'Yes'} | Multi: ${roleInfo2?.is_role_multi ? 'Yes' : 'No'}`,
                     data: assoc
                 });
                 }
@@ -176,7 +172,11 @@ async function showClassDetails(vertecClass: VertecClass, allClasses: VertecClas
 
     // Show details in Webview if something was selected.
     if (selection && selection.data && ('length' in selection.data || 'perceived_name' in selection.data)) {
-        const shouldGoBack = await showClassDetailView(selection.data as EnrichedVertecMember | EnrichedVertecAssociation);
+        const shouldGoBack = await showClassDetailView(
+            selection.data as EnrichedVertecMember | EnrichedVertecAssociation,
+            vertecClass,
+            allClasses
+        );
 
         if (shouldGoBack) {
             // User wants to go back to member/association list, show it again.
@@ -194,6 +194,8 @@ async function showClassDetails(vertecClass: VertecClass, allClasses: VertecClas
  */
 async function showClassDetailView(
     data: EnrichedVertecMember | EnrichedVertecAssociation,
+    currentClass: VertecClass,
+    allClasses: VertecClass[]
 ): Promise<boolean> {
     return new Promise((resolve) => {
         const panel = vscode.window.createWebviewPanel(
@@ -209,7 +211,11 @@ async function showClassDetailView(
         if ('length' in data) {
             panel.webview.html = getMemberDetailHtml(data as EnrichedVertecMember);
         } else if ('perceived_name' in data) {
-            panel.webview.html = getAssociationDetailHtml(data as EnrichedVertecAssociation);
+            panel.webview.html = getAssociationDetailHtml(
+                data as EnrichedVertecAssociation,
+                currentClass,
+                allClasses
+            );
         } else {
             resolve(false);
         }
@@ -402,7 +408,14 @@ function getMemberDetailHtml(member: EnrichedVertecMember): string {
 /**
  * Generates the HTML content for the association details view.
  */
-function getAssociationDetailHtml(assoc: EnrichedVertecAssociation): string {
+function getAssociationDetailHtml(
+    assoc: EnrichedVertecAssociation,
+    currentClass: VertecClass,
+    allClasses: VertecClass[]
+): string {
+    const roleInfo1 = getAssociationRoleInfo(assoc, currentClass, allClasses);
+    const roleInfo2 = getAssociationRoleInfo(assoc, currentClass, allClasses, true);
+
     return `<!DOCTYPE html>
 <html lang="en">
     ${getHtmlHead()}
@@ -413,7 +426,7 @@ function getAssociationDetailHtml(assoc: EnrichedVertecAssociation): string {
 
         <div class="section">
             <h2>Description</h2>
-            <p>${assoc.description || '-/-'}</p>
+            <p>${roleInfo1?.role_description || '-/-'}</p>
         </div>
 
         <div class="section">
@@ -455,38 +468,38 @@ function getAssociationDetailHtml(assoc: EnrichedVertecAssociation): string {
                 <tbody>
                     <tr>
                         <td>Class</td>
-                        <td>${assoc.role1_class?.name || '-/-'} | ${assoc.role1_class_alt?.name || '-/-'}</td>
-                        <td>${assoc.role2_class?.name || '-/-'} | ${assoc.role2_class_alt?.name || '-/-'}</td>
+                        <td>${roleInfo1?.role_class?.name || '-/-'} | ${roleInfo1?.role_class_alt?.name || '-/-'}</td>
+                        <td>${roleInfo2?.role_class?.name || '-/-'} | ${roleInfo2?.role_class_alt?.name || '-/-'}</td>
                     </tr>
                     <tr>
                         <td>Name</td>
-                        <td>${assoc.role1_name || '-/-'} | ${assoc.role1_name_alt || '-/-'}</td>
-                        <td>${assoc.role2_name || '-/-'} | ${assoc.role2_name_alt || '-/-'}</td>
+                        <td>${roleInfo1?.role_name || '-/-'} | ${roleInfo1?.role_name_alt || '-/-'}</td>
+                        <td>${roleInfo2?.role_name || '-/-'} | ${roleInfo2?.role_name_alt || '-/-'}</td>
                     </tr>
                     <tr>
                         <td>Description</td>
-                        <td>${assoc.role1_description || '-/-'}</td>
-                        <td>${assoc.role2_description || '-/-'}</td>
+                        <td>${roleInfo1?.role_description || '-/-'}</td>
+                        <td>${roleInfo2?.role_description || '-/-'}</td>
                     </tr>
                     <tr>
                         <td>Navigable</td>
-                        <td><span class="badge ${assoc.is_role1_navigable ? 'badge-yes' : 'badge-no'}">${assoc.is_role1_navigable ? 'Yes' : 'No'}</span></td>
-                        <td><span class="badge ${assoc.is_role2_navigable ? 'badge-yes' : 'badge-no'}">${assoc.is_role2_navigable ? 'Yes' : 'No'}</span></td>
+                        <td><span class="badge ${roleInfo1?.is_role_navigable ? 'badge-yes' : 'badge-no'}">${roleInfo1?.is_role_navigable ? 'Yes' : 'No'}</span></td>
+                        <td><span class="badge ${roleInfo2?.is_role_navigable ? 'badge-yes' : 'badge-no'}">${roleInfo2?.is_role_navigable ? 'Yes' : 'No'}</span></td>
                     </tr>
                     <tr>
                         <td>Multi</td>
-                        <td><span class="badge ${assoc.is_role1_multi ? 'badge-yes' : 'badge-no'}">${assoc.is_role1_multi ? 'Yes' : 'No'}</span></td>
-                        <td><span class="badge ${assoc.is_role2_multi ? 'badge-yes' : 'badge-no'}">${assoc.is_role2_multi ? 'Yes' : 'No'}</span></td>
+                        <td><span class="badge ${roleInfo1?.is_role_multi ? 'badge-yes' : 'badge-no'}">${roleInfo1?.is_role_multi ? 'Yes' : 'No'}</span></td>
+                        <td><span class="badge ${roleInfo2?.is_role_multi ? 'badge-yes' : 'badge-no'}">${roleInfo2?.is_role_multi ? 'Yes' : 'No'}</span></td>
                     </tr>
                     <tr>
                         <td>Composite</td>
-                        <td><span class="badge ${assoc.is_role1_composite ? 'badge-yes' : 'badge-no'}">${assoc.is_role1_composite ? 'Yes' : 'No'}</span></td>
-                        <td><span class="badge ${assoc.is_role2_composite ? 'badge-yes' : 'badge-no'}">${assoc.is_role2_composite ? 'Yes' : 'No'}</span></td>
+                        <td><span class="badge ${roleInfo1?.is_role_composite ? 'badge-yes' : 'badge-no'}">${roleInfo1?.is_role_composite ? 'Yes' : 'No'}</span></td>
+                        <td><span class="badge ${roleInfo2?.is_role_composite ? 'badge-yes' : 'badge-no'}">${roleInfo2?.is_role_composite ? 'Yes' : 'No'}</span></td>
                     </tr>
                     <tr>
                         <td>Hidden</td>
-                        <td><span class="badge ${assoc.is_role1_hidden ? 'badge-yes' : 'badge-no'}">${assoc.is_role1_hidden ? 'Yes' : 'No'}</span></td>
-                        <td><span class="badge ${assoc.is_role2_hidden ? 'badge-yes' : 'badge-no'}">${assoc.is_role2_hidden ? 'Yes' : 'No'}</span></td>
+                        <td><span class="badge ${roleInfo1?.is_role_hidden ? 'badge-yes' : 'badge-no'}">${roleInfo1?.is_role_hidden ? 'Yes' : 'No'}</span></td>
+                        <td><span class="badge ${roleInfo2?.is_role_hidden ? 'badge-yes' : 'badge-no'}">${roleInfo2?.is_role_hidden ? 'Yes' : 'No'}</span></td>
                     </tr>
                 </tbody>
             </table>

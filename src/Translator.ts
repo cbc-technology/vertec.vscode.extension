@@ -1,6 +1,6 @@
 import { QuickPickItem, window } from 'vscode';
 import * as vscode from 'vscode';
-import { getTranslations, getModel, VertecTranslation, VertecClass, EnrichedVertecMember, EnrichedVertecAssociation } from './DataProvider';
+import { getTranslations, getModel, VertecTranslation, VertecClass, EnrichedVertecMember, EnrichedVertecAssociation, createEnrichedVertecMember, createEnrichedVertecAssociation } from './DataProvider';
 
 class TranslationQuickPickItem implements QuickPickItem {
 	label: string;
@@ -226,12 +226,12 @@ export async function translateMember() {
 		classes.forEach(vertecclass => {
 			if (vertecclass.members) {
 				vertecclass.members.forEach(member => {
-					memberQuickPickItems.push(new MemberQuickPickItem(member));
+					memberQuickPickItems.push(new MemberQuickPickItem(createEnrichedVertecMember(member)));
 				});
 			}
 			if (vertecclass.associations) {
 				vertecclass.associations.forEach(association => {
-					memberQuickPickItems.push(new AssociationQuickPickItem(association));
+					memberQuickPickItems.push(new AssociationQuickPickItem(createEnrichedVertecAssociation(association)));
 				});
 			}
 		});

@@ -2,7 +2,7 @@
 	"name": "vertec-vscode-extension",
 	"displayName": "Vertec Extension",
 	"description": "This is a simple extension to provide usefull utilities for the day to day Vertec administrator.",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"private": true,
 	"license": "MIT",
 	"repository": {
@@ -16,6 +16,7 @@
 		"Other"
 	],
 	"activationEvents": [
+		"onLanguage:python",
 		"onCommand:vertec-vscode-extension"
 	],
 	"main": "./out/extension.js",
@@ -48,6 +49,10 @@
 			{
 				"command": "vertec.reload.translations",
 				"title": "Vertec: Reload translation cache"
+			},
+			{
+				"command": "vertec.reload.stubs",
+				"title": "Vertec: Reload stub cache"
 			}
 		],
 		"keybindings": [
